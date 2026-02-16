@@ -6,10 +6,18 @@ import TransportControls from './TransportControls'
 
 export default function PreviewPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const { timeline, currentTime, isPlaying, setIsPlaying, setCurrentTime } = useTimelineStore()
   const [volume, setVolume] = useState(1)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const requestRef = useRef<number>()
+
+  // Mock media resolver - in a real app this would come from a MediaStore
+  const getMediaUrl = (id: string) => {
+    // For testing, return a sample video for any ID
+    return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+  }
 
   // Calculate duration from tracks
   const timelineDuration = timeline ? 
@@ -20,37 +28,109 @@ export default function PreviewPanel() {
     )) / (timeline.metadata?.frameRate || 30) : 0
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+    const render = () => {
+      const canvas = canvasRef.current
+      const ctx = canvas?.getContext('2d')
+      const video = videoRef.current
+      
+      if (!canvas || !ctx || !timeline) return
 
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+      // Clear canvas
+      ctx.fillStyle = '#0a0a0f'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    const width = canvas.offsetWidth
-    const height = canvas.offsetHeight
-    const dpr = window.devicePixelRatio || 1
+      // Find active clip
+      let activeClip = null
+      let activeTrack = null
 
-    canvas.width = width * dpr
-    canvas.height = height * dpr
-    ctx.scale(dpr, dpr)
+      for (const track of timeline.tracks) {
+        if ((track as any).type !== 'video') continue // Only render video tracks
+        
+        const clip = track.clips.find(c => {
+           const start = c.timelineRange.start.value / (c.timelineRange.start.rate || 30)
+           const duration = c.timelineRange.duration.value / (c.timelineRange.duration.rate || 30)
+           return currentTime >= start && currentTime < start + duration
+        })
+        
+        if (clip) {
+          activeClip = clip as any
+          activeTrack = track
+          break // Simple single-track rendering for now
+        }
+      }
 
-    ctx.fillStyle = '#0a0a0f'
-    ctx.fillRect(0, 0, width, height)
+      if (activeClip && video) {
+        // Sync video
+        const clipStart = activeClip.timelineRange.start.value / (activeClip.timelineRange.start.rate || 30)
+        // Check if mediaRange exists, otherwise assume 0 offset
+        const mediaStart = activeClip.mediaRange ? activeClip.mediaRange.start.value / (activeClip.mediaRange.start.rate || 30) : 0
+        const videoTime = currentTime - clipStart + mediaStart
+        
+        // Only update source if changed to avoid reloading
+        const mediaUrl = getMediaUrl(activeClip.src)
+        if (video.src !== mediaUrl) {
+          video.src = mediaUrl
+        }
 
-    if (timeline) {
-      ctx.fillStyle = '#1a1a2e'
-      ctx.font = '14px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText('Preview', width / 2, height / 2)
-    } else {
-      ctx.fillStyle = '#3a3a4e'
-      ctx.font = '16px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText('No project loaded', width / 2, height / 2 - 10)
-      ctx.font = '12px sans-serif'
-      ctx.fillText('Import media to begin', width / 2, height / 2 + 10)
+        // Sync time (approximate for loop)
+        if (Math.abs(video.currentTime - videoTime) > 0.3) {
+           video.currentTime = videoTime
+        }
+
+        if (isPlaying && video.paused) {
+           video.play().catch(() => {})
+        } else if (!isPlaying && !video.paused) {
+           video.pause()
+        }
+
+        // Draw Frame
+        // Calculate aspect ratios to fit containment
+        const drawWidth = canvas.width
+        const drawHeight = canvas.height // Simplified fill
+        ctx.drawImage(video, 0, 0, drawWidth, drawHeight)
+        
+      } else {
+         // No active clip
+         if (video && !video.paused) video.pause()
+         
+         ctx.fillStyle = '#1a1a2e'
+         ctx.font = '14px sans-serif'
+         ctx.textAlign = 'center'
+         ctx.fillText('Preview', canvas.width / 2, canvas.height / 2)
+      }
+      
+      requestRef.current = requestAnimationFrame(render)
     }
-  }, [timeline, currentTime])
+
+    requestRef.current = requestAnimationFrame(render)
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current)
+    }
+  }, [timeline, currentTime, isPlaying])
+
+  // Handle Playback Clock
+  useEffect(() => {
+     if (!isPlaying) return
+
+     let lastTime = performance.now()
+     const animate = (time: number) => {
+        const delta = (time - lastTime) / 1000
+        lastTime = time
+        
+        if (currentTime < timelineDuration) {
+           setCurrentTime(currentTime + delta)
+           requestRef.current = requestAnimationFrame(animate)
+        } else {
+           setIsPlaying(false)
+        }
+     }
+     
+     requestRef.current = requestAnimationFrame(animate)
+     return () => {
+       if (requestRef.current) cancelAnimationFrame(requestRef.current)
+     }
+  }, [isPlaying, currentTime, timelineDuration, setCurrentTime, setIsPlaying])
+
 
   const handleFullscreen = () => {
     if (!containerRef.current) return
@@ -73,6 +153,7 @@ export default function PreviewPanel() {
 
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume)
+    if (videoRef.current) videoRef.current.volume = newVolume
   }
 
   return (
@@ -81,6 +162,16 @@ export default function PreviewPanel() {
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full"
+          width={800} // Default resolution
+          height={450} 
+        />
+        {/* Hidden video element for source */}
+        <video 
+           ref={videoRef} 
+           className="hidden" 
+           crossOrigin="anonymous" 
+           playsInline 
+           muted={volume === 0} 
         />
         
         <div className="absolute top-2 right-2 flex gap-2">
