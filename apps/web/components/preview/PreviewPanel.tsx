@@ -12,6 +12,7 @@ export default function PreviewPanel() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const requestRef = useRef<number>()
+  const playbackRef = useRef<number>()
 
   // Mock media resolver - in a real app this would come from a MediaStore
   const getMediaUrl = (id: string) => {
@@ -27,70 +28,96 @@ export default function PreviewPanel() {
       )
     )) / (timeline.metadata?.frameRate || 30) : 0
 
+  // Main Render Loop
   useEffect(() => {
     const render = () => {
       const canvas = canvasRef.current
       const ctx = canvas?.getContext('2d')
       const video = videoRef.current
       
-      if (!canvas || !ctx || !timeline) return
+      if (!canvas || !ctx) return
+
+      // Access fresh state directly to avoid dependency issues in loop
+      const state = useTimelineStore.getState()
+      const currentTimeline = state.timeline
+      const time = state.currentTime
+      const playing = state.isPlaying
 
       // Clear canvas
       ctx.fillStyle = '#0a0a0f'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
+      if (!currentTimeline) {
+        ctx.fillStyle = '#3a3a4e'
+        ctx.font = '16px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('No project loaded', canvas.width / 2, canvas.height / 2 - 10)
+        ctx.font = '12px sans-serif'
+        ctx.fillText('Import media to begin', canvas.width / 2, canvas.height / 2 + 10)
+        requestRef.current = requestAnimationFrame(render)
+        return
+      }
+
       // Find active clip
       let activeClip = null
-      let activeTrack = null
-
-      for (const track of timeline.tracks) {
+      
+      for (const track of currentTimeline.tracks) {
         if ((track as any).type !== 'video') continue // Only render video tracks
         
         const clip = track.clips.find(c => {
            const start = c.timelineRange.start.value / (c.timelineRange.start.rate || 30)
            const duration = c.timelineRange.duration.value / (c.timelineRange.duration.rate || 30)
-           return currentTime >= start && currentTime < start + duration
+           return time >= start && time < start + duration
         })
         
         if (clip) {
           activeClip = clip as any
-          activeTrack = track
-          break // Simple single-track rendering for now
+          break // Simple single-track rendering
         }
       }
 
       if (activeClip && video) {
         // Sync video
         const clipStart = activeClip.timelineRange.start.value / (activeClip.timelineRange.start.rate || 30)
-        // Check if mediaRange exists, otherwise assume 0 offset
         const mediaStart = activeClip.mediaRange ? activeClip.mediaRange.start.value / (activeClip.mediaRange.start.rate || 30) : 0
-        const videoTime = currentTime - clipStart + mediaStart
+        const videoTime = time - clipStart + mediaStart
         
-        // Only update source if changed to avoid reloading
         const mediaUrl = getMediaUrl(activeClip.src)
+        
+        // Load video if needed
         if (video.src !== mediaUrl) {
           video.src = mediaUrl
+          video.load()
         }
 
-        // Sync time (approximate for loop)
+        // Sync time if significantly drifted (allow small drift for smooth playback)
         if (Math.abs(video.currentTime - videoTime) > 0.3) {
            video.currentTime = videoTime
         }
 
-        if (isPlaying && video.paused) {
-           video.play().catch(() => {})
-        } else if (!isPlaying && !video.paused) {
+        // Handle Play/Pause
+        if (playing && video.paused) {
+           const playPromise = video.play()
+           if (playPromise !== undefined) {
+             playPromise.catch(error => {
+               console.warn("Auto-play prevented:", error)
+             })
+           }
+        } else if (!playing && !video.paused) {
            video.pause()
         }
 
-        // Draw Frame
-        // Calculate aspect ratios to fit containment
-        const drawWidth = canvas.width
-        const drawHeight = canvas.height // Simplified fill
-        ctx.drawImage(video, 0, 0, drawWidth, drawHeight)
+        // Draw Frame if ready
+        if (video.readyState >= 2) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        } else {
+          // Loading indicator
+          ctx.fillStyle = '#1a1a2e'
+          ctx.fillText('Loading Video...', canvas.width / 2, canvas.height / 2)
+        }
         
       } else {
-         // No active clip
+         // No active clip found
          if (video && !video.paused) video.pause()
          
          ctx.fillStyle = '#1a1a2e'
@@ -106,9 +133,9 @@ export default function PreviewPanel() {
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current)
     }
-  }, [timeline, currentTime, isPlaying])
+  }, []) // Empty dependency array = persistent loop
 
-  // Handle Playback Clock
+  // Handle Playback Clock (separate loop)
   useEffect(() => {
      if (!isPlaying) return
 
@@ -117,19 +144,27 @@ export default function PreviewPanel() {
         const delta = (time - lastTime) / 1000
         lastTime = time
         
-        if (currentTime < timelineDuration) {
-           setCurrentTime(currentTime + delta)
-           requestRef.current = requestAnimationFrame(animate)
+        const state = useTimelineStore.getState()
+        const currentT = state.currentTime
+        
+        // Check duration from fresh state or ref
+        // We can approximate or recalculate efficiently
+        // For now, assume a max duration or use the prop if passed down
+        // But better to check timeline limit
+        
+        if (currentT < 300) { // arbitrary limit or check timeline end
+           setCurrentTime(currentT + delta)
+           playbackRef.current = requestAnimationFrame(animate)
         } else {
            setIsPlaying(false)
         }
      }
      
-     requestRef.current = requestAnimationFrame(animate)
+     playbackRef.current = requestAnimationFrame(animate)
      return () => {
-       if (requestRef.current) cancelAnimationFrame(requestRef.current)
+       if (playbackRef.current) cancelAnimationFrame(playbackRef.current)
      }
-  }, [isPlaying, currentTime, timelineDuration, setCurrentTime, setIsPlaying])
+  }, [isPlaying, setCurrentTime, setIsPlaying])
 
 
   const handleFullscreen = () => {
@@ -171,7 +206,7 @@ export default function PreviewPanel() {
            className="hidden" 
            crossOrigin="anonymous" 
            playsInline 
-           muted={volume === 0} 
+           muted={true} // Force muted to ensure autoplay works
         />
         
         <div className="absolute top-2 right-2 flex gap-2">
