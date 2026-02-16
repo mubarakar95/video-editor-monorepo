@@ -15,10 +15,7 @@ export default function ChatView() {
   const handleSend = () => {
     if (!input.trim() || isLoading) return
 
-    addMessage({
-      role: 'user',
-      content: input.trim()
-    })
+    useAgentStore.getState().sendMessage(input.trim())
     setInput('')
   }
 

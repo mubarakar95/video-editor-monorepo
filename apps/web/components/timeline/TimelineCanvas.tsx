@@ -65,6 +65,59 @@ export default function TimelineCanvas() {
       ref={containerRef}
       className="relative h-full flex flex-col"
       onWheel={handleWheel}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault()
+        const data = e.dataTransfer.getData('application/json')
+        if (!data) return
+        
+        try {
+          const file = JSON.parse(data)
+          let currentTimeline = timeline
+          
+          if (!currentTimeline) {
+            const newTimeline = {
+              id: 'project-1',
+              name: 'New Project',
+              metadata: {
+                width: 1920,
+                height: 1080,
+                frameRate: 30,
+                duration: 0
+              },
+              tracks: [
+                { id: 'track-1', name: 'Video 1', type: 'video', clips: [] },
+                { id: 'track-2', name: 'Audio 1', type: 'audio', clips: [] }
+              ]
+            }
+            useTimelineStore.getState().setTimeline(newTimeline as any) // Type check bypass for quick fix
+            currentTimeline = newTimeline as any
+          }
+
+          if (currentTimeline) { // Should be true now
+             const track = currentTimeline.tracks.find((t: any) => t.type === file.type) || currentTimeline.tracks[0]
+             const frameRate = currentTimeline.metadata.frameRate || 30
+             
+             useTimelineStore.getState().addClip(track.id, {
+               id: Math.random().toString(36).substr(2, 9),
+               name: file.name,
+               type: file.type,
+               timelineRange: {
+                 start: { value: 0, unit: 'frames' },
+                 duration: { value: (file.duration || 5) * frameRate, unit: 'frames' }
+               },
+               mediaRange: {
+                 start: { value: 0, unit: 'frames' },
+                 duration: { value: (file.duration || 5) * frameRate, unit: 'frames' }
+               },
+               src: file.id // Using ID as src reference for now
+             } as any)
+          }
+
+        } catch (err) {
+          console.error('Failed to parse dropped item', err)
+        }
+      }}
     >
       <div className="flex items-center justify-between px-4 py-2 border-b border-dark-700">
         <div className="flex items-center gap-2">

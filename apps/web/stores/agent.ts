@@ -18,6 +18,7 @@ interface AgentState {
 }
 
 interface AgentActions {
+  sendMessage: (content: string) => Promise<void>
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void
   setLoading: (isLoading: boolean) => void
   setMode: (mode: AgentMode) => void
@@ -35,11 +36,54 @@ const initialState: AgentState = {
   error: null
 }
 
-export const useAgentStore = create<AgentStore>((set) => ({
+export const useAgentStore = create<AgentStore>((set, get) => ({
   ...initialState,
+
+  sendMessage: async (content: string) => {
+    const message: Message = {
+      id: `msg-${Date.now()}`,
+      role: 'user',
+      content,
+      timestamp: Date.now()
+    }
+
+    set((state) => ({
+      messages: [...state.messages, message],
+      isLoading: true,
+      error: null
+    }))
+
+    try {
+      const response = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages: [...get().messages, message] 
+        })
+      })
+
+      if (!response.ok) throw new Error('Failed to send message')
+
+      const data = await response.json()
+      
+      set((state) => ({
+        messages: [...state.messages, {
+          id: data.id,
+          role: 'assistant',
+          content: data.content,
+          timestamp: Date.now(),
+          provider: data.provider
+        }],
+        isLoading: false
+      }))
+    } catch (error) {
+      set({ error: (error as Error).message, isLoading: false })
+    }
+  },
 
   addMessage: (message) =>
     set((state) => ({
+      // ... existing implementation if needed or kept for manual adds
       messages: [
         ...state.messages,
         {

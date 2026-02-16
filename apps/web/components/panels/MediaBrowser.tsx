@@ -31,14 +31,32 @@ export default function MediaBrowser() {
   })
 
   const handleImport = () => {
-    console.log('Import files')
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    input.accept = 'video/*,audio/*,image/*'
+    input.onchange = (e) => {
+      const fileList = (e.target as HTMLInputElement).files
+      if (!fileList) return
+
+      const newFiles: MediaFile[] = Array.from(fileList).map(file => ({
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        type: file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image',
+        size: file.size,
+        duration: 0 // In a real app, we'd parse metadata here
+      }))
+
+      setFiles(prev => [...prev, ...newFiles])
+    }
+    input.click()
   }
 
   const handleDragStart = (e: React.DragEvent, file: MediaFile) => {
     e.dataTransfer.setData('application/json', JSON.stringify(file))
     e.dataTransfer.effectAllowed = 'copy'
   }
-
+// ... existing helper functions ...
   const formatDuration = (seconds?: number) => {
     if (!seconds) return ''
     const mins = Math.floor(seconds / 60)
