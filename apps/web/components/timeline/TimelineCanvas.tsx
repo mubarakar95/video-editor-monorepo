@@ -102,13 +102,14 @@ export default function TimelineCanvas() {
                id: Math.random().toString(36).substr(2, 9),
                name: file.name,
                type: file.type,
+               state: 'active', // Ensure state is set for color
                timelineRange: {
-                 start: { value: 0, unit: 'frames' },
-                 duration: { value: (file.duration || 5) * frameRate, unit: 'frames' }
+                 start: { value: 0, rate: frameRate },
+                 duration: { value: (file.duration || 5) * frameRate, rate: frameRate }
                },
                mediaRange: {
-                 start: { value: 0, unit: 'frames' },
-                 duration: { value: (file.duration || 5) * frameRate, unit: 'frames' }
+                 start: { value: 0, rate: frameRate },
+                 duration: { value: (file.duration || 5) * frameRate, rate: frameRate }
                },
                src: file.id // Using ID as src reference for now
              } as any)
