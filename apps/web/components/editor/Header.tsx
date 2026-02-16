@@ -1,84 +1,144 @@
-'use client'
+"use client";
 
-import { useTimelineStore } from '@/stores'
+import { useState } from "react";
+import { useTimelineStore, useEditorStore } from "@/stores";
+import ExportModal from "../modals/ExportModal";
+import ShortcutsModal from "../modals/ShortcutsModal";
 
 interface HeaderProps {
-  projectName: string
+  projectName: string;
 }
 
 export default function Header({ projectName }: HeaderProps) {
-  const { timeline } = useTimelineStore()
+  const { timeline, undo, redo, canUndo, canRedo } = useTimelineStore();
+  const { settings, updateSettings } = useEditorStore();
+  const [showExport, setShowExport] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   const handleUndo = () => {
-    console.log('Undo')
-  }
+    if (canUndo()) undo();
+  };
 
   const handleRedo = () => {
-    console.log('Redo')
-  }
-
-  const handleExport = () => {
-    console.log('Export')
-  }
-
-  const handleSettings = () => {
-    console.log('Settings')
-  }
+    if (canRedo()) redo();
+  };
 
   return (
-    <header className="flex items-center justify-between px-4 py-2 border-b border-dark-700 bg-dark-800">
-      <div className="flex items-center gap-4">
-        <h1 className="text-lg font-semibold text-white">{projectName}</h1>
-        {timeline && (
-          <span className="text-xs text-dark-400">
-            {timeline.tracks.length} tracks
-          </span>
-        )}
-      </div>
-      
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1 mr-2">
+    <>
+      <header className="flex items-center justify-between px-4 py-2 border-b border-dark-700 bg-dark-800">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <svg
+              className="w-6 h-6 text-blue-500"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z" />
+            </svg>
+            <h1 className="text-lg font-semibold text-white">{projectName}</h1>
+          </div>
+          {timeline && (
+            <span className="text-xs text-dark-400">
+              {timeline.tracks.length} tracks • {settings.width}×
+              {settings.height} @ {settings.frameRate}fps
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Undo/Redo */}
+          <div className="flex items-center gap-1 mr-2">
+            <button
+              onClick={handleUndo}
+              disabled={!canUndo()}
+              className="p-2 text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Undo (Ctrl+Z)"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={!canRedo()}
+              className="p-2 text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Keyboard Shortcuts */}
           <button
-            onClick={handleUndo}
+            onClick={() => setShowShortcuts(true)}
             className="p-2 text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors"
-            title="Undo"
+            title="Keyboard Shortcuts"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+              />
             </svg>
           </button>
+
+          {/* Export */}
           <button
-            onClick={handleRedo}
-            className="p-2 text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors"
-            title="Redo"
+            onClick={() => setShowExport(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+              />
             </svg>
+            Export
           </button>
         </div>
-        
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-          </svg>
-          Export
-        </button>
-        
-        <button
-          onClick={handleSettings}
-          className="p-2 text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors"
-          title="Settings"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-      </div>
-    </header>
-  )
+      </header>
+
+      <ExportModal isOpen={showExport} onClose={() => setShowExport(false)} />
+      <ShortcutsModal
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+      />
+    </>
+  );
 }

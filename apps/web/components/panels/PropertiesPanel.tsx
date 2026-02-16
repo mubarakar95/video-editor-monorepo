@@ -1,14 +1,16 @@
-'use client'
+"use client";
 
-import { useTimelineStore } from '@/stores'
-import type { Clip } from '@video-editor/timeline-schema'
+import { useTimelineStore } from "@/stores";
+import type { Clip } from "@video-editor/timeline-schema";
 
 export default function PropertiesPanel() {
-  const { timeline, selectedClipId } = useTimelineStore()
+  const { timeline, selectedClipIds } = useTimelineStore();
+
+  const selectedClipId = selectedClipIds.length > 0 ? selectedClipIds[0] : null;
 
   const selectedClip = timeline?.tracks
-    .flatMap(track => track.clips)
-    .find(clip => clip.id === selectedClipId)
+    .flatMap((track) => track.clips)
+    .find((clip) => clip.id === selectedClipId);
 
   if (!selectedClip) {
     return (
@@ -20,19 +22,23 @@ export default function PropertiesPanel() {
           <p className="text-xs text-dark-500">No clip selected</p>
         </div>
       </div>
-    )
+    );
   }
 
   const formatTime = (frames: number, rate: number) => {
-    const totalSeconds = frames / rate
-    const mins = Math.floor(totalSeconds / 60)
-    const secs = Math.floor(totalSeconds % 60)
-    const remainingFrames = Math.floor((totalSeconds % 1) * rate)
-    return `${mins}:${secs.toString().padStart(2, '0')}:${remainingFrames.toString().padStart(2, '0')}`
-  }
+    const totalSeconds = frames / rate;
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = Math.floor(totalSeconds % 60);
+    const remainingFrames = Math.floor((totalSeconds % 1) * rate);
+    return `${mins}:${secs.toString().padStart(2, "0")}:${remainingFrames.toString().padStart(2, "0")}`;
+  };
 
-  const startTime = selectedClip.timelineRange.start.value / selectedClip.timelineRange.start.rate
-  const duration = selectedClip.timelineRange.duration.value / selectedClip.timelineRange.duration.rate
+  const startTime =
+    selectedClip.timelineRange.start.value /
+    selectedClip.timelineRange.start.rate;
+  const duration =
+    selectedClip.timelineRange.duration.value /
+    selectedClip.timelineRange.duration.rate;
 
   return (
     <div className="flex flex-col h-full">
@@ -50,15 +56,27 @@ export default function PropertiesPanel() {
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-dark-500">State</span>
-              <span className="text-white capitalize">{selectedClip.state}</span>
+              <span className="text-white capitalize">
+                {selectedClip.state}
+              </span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-dark-500">Start</span>
-              <span className="text-white font-mono">{formatTime(selectedClip.timelineRange.start.value, selectedClip.timelineRange.start.rate)}</span>
+              <span className="text-white font-mono">
+                {formatTime(
+                  selectedClip.timelineRange.start.value,
+                  selectedClip.timelineRange.start.rate,
+                )}
+              </span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-dark-500">Duration</span>
-              <span className="text-white font-mono">{formatTime(selectedClip.timelineRange.duration.value, selectedClip.timelineRange.duration.rate)}</span>
+              <span className="text-white font-mono">
+                {formatTime(
+                  selectedClip.timelineRange.duration.value,
+                  selectedClip.timelineRange.duration.rate,
+                )}
+              </span>
             </div>
           </div>
         </div>
@@ -67,7 +85,9 @@ export default function PropertiesPanel() {
           <h3 className="text-xs font-medium text-dark-400 mb-2">Timing</h3>
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-dark-500 mb-1">Start Time</label>
+              <label className="block text-xs text-dark-500 mb-1">
+                Start Time
+              </label>
               <input
                 type="number"
                 step="0.1"
@@ -77,7 +97,9 @@ export default function PropertiesPanel() {
               />
             </div>
             <div>
-              <label className="block text-xs text-dark-500 mb-1">Duration</label>
+              <label className="block text-xs text-dark-500 mb-1">
+                Duration
+              </label>
               <input
                 type="number"
                 step="0.1"
@@ -95,18 +117,33 @@ export default function PropertiesPanel() {
             {selectedClip.effects && selectedClip.effects.length > 0 ? (
               <div className="space-y-2">
                 {selectedClip.effects.map((effect, index) => (
-                  <div key={index} className="flex items-center justify-between text-xs">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between text-xs"
+                  >
                     <span className="text-white">{effect.name}</span>
                     <button className="text-dark-400 hover:text-red-400">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-dark-500 text-center">No effects applied</p>
+              <p className="text-xs text-dark-500 text-center">
+                No effects applied
+              </p>
             )}
           </div>
         </div>
@@ -116,17 +153,21 @@ export default function PropertiesPanel() {
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-dark-500">ID</span>
-              <span className="text-dark-400 font-mono text-[10px]">{selectedClip.id}</span>
+              <span className="text-dark-400 font-mono text-[10px]">
+                {selectedClip.id}
+              </span>
             </div>
             {selectedClip.sourceId && (
               <div className="flex justify-between text-xs">
                 <span className="text-dark-500">Source</span>
-                <span className="text-dark-400 font-mono text-[10px]">{selectedClip.sourceId}</span>
+                <span className="text-dark-400 font-mono text-[10px]">
+                  {selectedClip.sourceId}
+                </span>
               </div>
             )}
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
